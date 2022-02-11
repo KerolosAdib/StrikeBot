@@ -69,12 +69,7 @@ public class Commands extends ListenerAdapter {
             if (event.getMessage().getMentionedMembers().toArray().length == 1)
             {
                 Member member = event.getMessage().getMentionedMembers().get(0);
-                Object[] voiceChannels = event.getGuild().getVoiceChannels().toArray();
-                AudioChannel audioChannel = member.getVoiceState().getChannel();
-                if (audioChannel != null)
-                {
-                    event.getGuild().moveVoiceMember(member, null).queue();
-                }
+                event.getGuild().moveVoiceMember(member, null).queue();
             }
         }
     }
