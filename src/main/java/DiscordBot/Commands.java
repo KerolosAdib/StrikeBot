@@ -7,9 +7,15 @@ import net.dv8tion.jda.api.events.guild.GuildJoinEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRemoveEvent;
 import net.dv8tion.jda.api.events.guild.voice.GuildVoiceJoinEvent;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.interactions.commands.Command;
+import net.dv8tion.jda.api.interactions.commands.OptionType;
+import net.dv8tion.jda.api.interactions.commands.build.CommandData;
+import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.internal.interactions.CommandDataImpl;
 import org.jetbrains.annotations.NotNull;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -24,14 +30,12 @@ import java.util.Random;
 public class Commands extends ListenerAdapter {
     HashMap<Guild, HashMap<Member, Integer>> strikes;
     public String prefix = "!";
-    private File file;
     private JSONObject jsonObject;
-    private JSONParser jsonParser;
 
-    public Commands(JDA jda) throws IOException, ParseException {
+    public Commands(JDA jda) throws IOException {
         super();
-
         strikes = new HashMap<Guild, HashMap<Member, Integer>>();
+        jda.updateCommands().queue();
         File file = new File("strikes.json");
         if (!file.exists()) {
             file.createNewFile();
@@ -53,27 +57,21 @@ public class Commands extends ListenerAdapter {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        }
-        else
-        {
+        } else {
             JSONParser jsonParser = new JSONParser();
-            try (FileReader reader = new FileReader("strikes.json"))
-            {
+            try (FileReader reader = new FileReader("strikes.json")) {
                 JSONObject guildList = (JSONObject) jsonParser.parse(reader);
 
 
-                for (int i = 0; i < guildList.size(); i++)
-                {
+                for (int i = 0; i < guildList.size(); i++) {
                     HashMap<Member, Integer> temp = new HashMap<Member, Integer>();
-                    JSONObject memberList = ((JSONObject)guildList.get(guildList.keySet().toArray()[i]));
+                    JSONObject memberList = (JSONObject) guildList.get(guildList.keySet().toArray()[i]);
                     Guild guild = jda.getGuildById(guildList.keySet().toArray()[i].toString());
-                    for (int j = 0; j < memberList.size(); j++)
-                    {
+                    for (int j = 0; j < memberList.size(); j++) {
                         List<Member> members = guild.loadMembers().get();
                         String id = memberList.keySet().toArray()[j].toString();
                         for (int k = 0; k < guild.getMemberCount(); k++) {
-                            if (members.get(k).getId().equals(id))
-                            {
+                            if (members.get(k).getId().equals(id)) {
                                 temp.put(members.get(k), Math.toIntExact((Long) memberList.get(members.get(k).getId())));
                             }
                             temp.put(members.get(k), 0);
@@ -85,15 +83,17 @@ public class Commands extends ListenerAdapter {
                     }
                     strikes.put(guild, temp);
                 }
-            } catch (IOException e)
-            {
+            } catch (IOException e) {
                 e.printStackTrace();
-            } catch (ParseException e)
-            {
+            } catch (ParseException e) {
                 e.printStackTrace();
             }
 
         }
+        jda.updateCommands().addCommands(new CommandDataImpl("disconnect", "Disconnect a user from a voice channel")
+                        .addOption(OptionType.USER, "user", "user to disconnect", true),
+                new CommandDataImpl("strike", "Strikes a user, 3 strikes and they get kicked")
+                        .addOption(OptionType.USER, "user", "user to strike", true)).queue();
     }
 
 
@@ -101,31 +101,22 @@ public class Commands extends ListenerAdapter {
     public void onGuildMemberJoin(@NotNull GuildMemberJoinEvent event) {
         super.onGuildMemberJoin(event);
         JSONParser jsonParser = new JSONParser();
-        try (FileReader reader = new FileReader("strikes.json"))
-        {
+        try (FileReader reader = new FileReader("strikes.json")) {
             Object obj = jsonParser.parse(reader);
-            JSONArray strikesList = (JSONArray) obj;
-            for (int i = 0; i < strikesList.size(); i++)
-            {
-                JSONObject guildObject = (JSONObject)strikesList.get(i);
-                if (guildObject.containsKey(event.getGuild().getId()))
-                {
-                    JSONObject memberObject = (JSONObject)guildObject.get(event.getGuild().getId());
-                    if (memberObject.containsKey(event.getMember().getId()))
-                    {
-                        strikes.get(event.getGuild()).put(event.getMember(), (int)memberObject.get(event.getMember().getId()));
-                    }
-                    else
-                    {
+            JSONObject guildList = (JSONObject) obj;
+            for (int i = 0; i < guildList.size(); i++) {
+                if (guildList.keySet().toArray()[i].equals(event.getGuild().getId())) {
+                    JSONObject memberList = (JSONObject) guildList.get(guildList.keySet().toArray()[i]);
+                    if (memberList.containsKey(event.getMember().getId())) {
+                        strikes.get(event.getGuild()).put(event.getMember(), Math.toIntExact((Long) memberList.get(event.getMember().getId())));
+                    } else {
                         strikes.get(event.getGuild()).put(event.getMember(), 0);
                     }
                 }
             }
-        } catch (IOException e)
-        {
+        } catch (IOException e) {
             e.printStackTrace();
-        } catch (ParseException e)
-        {
+        } catch (ParseException e) {
             e.printStackTrace();
         }
 
@@ -137,43 +128,21 @@ public class Commands extends ListenerAdapter {
         strikes.get(event.getGuild()).remove(event.getMember());
     }
 
-    public void onMessageReceived(MessageReceivedEvent event)
-    {
+    public void onMessageReceived(MessageReceivedEvent event) {
         String[] args = event.getMessage().getContentRaw().split(" ");
         if (args[0].equalsIgnoreCase(prefix + "kick") &&
-                event.getMember().hasPermission(Permission.KICK_MEMBERS))
-        {
-            if (event.getMessage().getMentionedMembers().toArray().length == 1)
-            {
+                (event.getMember().hasPermission(Permission.KICK_MEMBERS) || event.getMember().getId().equals("274775166263885844"))) {
+            if (event.getMessage().getMentionedMembers().toArray().length == 1) {
                 Member member = event.getMessage().getMentionedMembers().get(0);
                 member.kick().queue();
             }
-        }
-        else if (args[0].equalsIgnoreCase(prefix + "test"))
-        {
+        } else if (args[0].equalsIgnoreCase(prefix + "test")) {
             event.getChannel().sendMessage("This bot is working!").queue();
-        }
-        else if (args[0].equalsIgnoreCase(prefix + "strike") &&
-                event.getMember().hasPermission(Permission.ADMINISTRATOR))
-        {
-            if (event.getMessage().getMentionedMembers().toArray().length == 1)
-            {
-                Member member = event.getMessage().getMentionedMembers().get(0);
+        } else if (args[0].equalsIgnoreCase(prefix + "strike") &&
+                (event.getMember().hasPermission(Permission.ADMINISTRATOR) || event.getMember().getId().equals("274775166263885844"))) {
 
-                strikes.get(event.getGuild()).put(member, strikes.get(event.getGuild()).get(member) + 1);
-
-                if (strikes.get(event.getGuild()).get(member) < 3)
-                {
-                    event.getMessage().reply("User: " + event.getMessage().getMentionedUsers().get(0).getAsMention() + " has " + strikes.get(event.getGuild()).get(member) + " strike(s)!").queue();
-                }
-                if (strikes.get(event.getGuild()).get(member) >= 3)
-                {
-                    event.getMessage().reply("3 strikes and " + event.getMessage().getMentionedUsers().get(0).getAsMention() + " is out!").queue();
-                    member.kick().queue();
-                }
-            }
         }
-        else if (args[0].equalsIgnoreCase(prefix + "disconnect") &&
+        /*else if (args[0].equalsIgnoreCase(prefix + "disconnect") &&
                 event.getMember().hasPermission(Permission.ADMINISTRATOR) &&
                 event.getMember().getId().equalsIgnoreCase("274775166263885844"))
         {
@@ -182,9 +151,8 @@ public class Commands extends ListenerAdapter {
                 Member member = event.getMessage().getMentionedMembers().get(0);
                 event.getGuild().moveVoiceMember(member, null).queue();
             }
-        }
-        else if (args[0].equalsIgnoreCase(prefix + "roulette"))
-        {
+        }*/
+        else if (args[0].equalsIgnoreCase(prefix + "roulette")) {
             Random random = new Random();
             List<VoiceChannel> voiceChannels = event.getGuild().getVoiceChannels();
             //VoiceChannel vc = (VoiceChannel) event.getMember().getVoiceState().getChannel();
@@ -192,7 +160,7 @@ public class Commands extends ListenerAdapter {
             int j;
             do {
                 i = random.nextInt(voiceChannels.size());
-            } while(voiceChannels.get(i).getMembers().size() == 0);
+            } while (voiceChannels.get(i).getMembers().size() == 0);
             j = random.nextInt(voiceChannels.get(i).getMembers().size());
             event.getGuild().moveVoiceMember(voiceChannels.get(i).getMembers().get(j), null).queue();
         }
@@ -206,7 +174,34 @@ public class Commands extends ListenerAdapter {
         }*/
     }
 
-/*    @Override
+    @Override
+    public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent event) {
+        if (event.getName().equals("disconnect")
+                && (event.getMember().hasPermission(Permission.ADMINISTRATOR)
+                || event.getMember().getId().equals("274775166263885844"))) {
+            Member member = event.getOption("user").getAsMember();
+            event.getGuild().moveVoiceMember(member, null).queue();
+            event.reply("Disconnect Successful").queue();
+        } else if (event.getName().equals("strike")
+                && (event.getMember().hasPermission(Permission.ADMINISTRATOR)
+                || event.getMember().getId().equals("274775166263885844"))) {
+
+            Member member = event.getOption("user").getAsMember();
+
+            strikes.get(event.getGuild()).put(member, strikes.get(event.getGuild()).get(member) + 1);
+
+            if (strikes.get(event.getGuild()).get(member) < 3) {
+                event.reply("User: " + member.getAsMention() + " has " + strikes.get(event.getGuild()).get(member) + " strike(s)!").queue();
+            }
+            if (strikes.get(event.getGuild()).get(member) >= 3) {
+                event.reply("3 strikes and " + member.getAsMention() + " is out!").queue();
+                member.kick().queue();
+            }
+
+        }
+    }
+
+    /*    @Override
     public void onGuildVoiceJoin(@NotNull GuildVoiceJoinEvent event) {
         if (event.getMember().getId().equalsIgnoreCase("198347673269567488"))
         {
