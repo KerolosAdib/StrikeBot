@@ -80,9 +80,11 @@ public class Commands extends ListenerAdapter
 
                     for (int j = 0; j < memberList.size(); j++)
                     {
-                        if (memberIds.contains(memberList.keySet().toArray()[j].toString()))
+                        String str = memberList.keySet().toArray()[j].toString();
+                        if (memberIds.contains(str))
                         {
-                            temp.put(members.get(j), Math.toIntExact((Long) memberList.get(memberIds.get(j))));
+                            temp.put(members.get(memberIds.indexOf(str)), Math.toIntExact((Long) memberList.get(str)));
+
                         }
                     }
                     strikes.put(guild, temp);
@@ -173,8 +175,8 @@ public class Commands extends ListenerAdapter
                 new CommandDataImpl("strike", "Strikes a user, 3 strikes and they get kicked")
                         .addOption(OptionType.USER, "user", "user to strike", true),
                 new CommandDataImpl("roulette", "Chooses a random person to be disconnected"),
-                new CommandDataImpl("kick", "kick a bitch out")
-                        .addOption(OptionType.USER, "user", "the bitch to kick out", true)).queue();
+                new CommandDataImpl("kick", "kick a user out")
+                        .addOption(OptionType.USER, "user", "the user to kick out", true)).queue();
     }
 
 
