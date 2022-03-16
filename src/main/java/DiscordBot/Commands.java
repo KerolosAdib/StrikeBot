@@ -56,14 +56,16 @@ public class Commands extends ListenerAdapter
             File file = new File(jda.getGuilds().get(i).getId() + ".json");
             if (!file.exists())
             {
-                file.createNewFile();
                 JSONObject memberList = new JSONObject();
                 HashMap<Member, Integer> temp = new HashMap<>();
                 List<Member> members = jda.getGuilds().get(i).loadMembers().get();
                 for (int j = 0; j < jda.getGuilds().get(i).getMemberCount(); j++)
                 {
-                    memberList.put(members.get(j).getId(), 0);
-                    temp.put(members.get(j), 0);
+                    if (!members.get(j).getUser().isBot())
+                    {
+                        memberList.put(members.get(j).getId(), 0);
+                        temp.put(members.get(j), 0);
+                    }
                 }
                 strikes.put(jda.getGuilds().get(i), temp);
                 try (FileWriter fileWriter = new FileWriter(jda.getGuilds().get(i).getId() + ".json"))
@@ -195,35 +197,37 @@ public class Commands extends ListenerAdapter
     public void onGuildMemberJoin(@NotNull GuildMemberJoinEvent event)
     {
         super.onGuildMemberJoin(event);
-        JSONParser jsonParser = new JSONParser();
-        try (FileReader reader = new FileReader(event.getGuild().getId() + ".json"))
+        if (!event.getUser().isBot())
         {
-            Object obj = jsonParser.parse(reader);
-            JSONObject memberList = (JSONObject) obj;
-            if (memberList.containsKey(event.getMember().getId()))
+            JSONParser jsonParser = new JSONParser();
+            try (FileReader reader = new FileReader(event.getGuild().getId() + ".json"))
             {
-                strikes.get(event.getGuild()).put(event.getMember(), Math.toIntExact((Long) memberList.get(event.getMember().getId())));
+                Object obj = jsonParser.parse(reader);
+                JSONObject memberList = (JSONObject) obj;
+                if (memberList.containsKey(event.getMember().getId()))
+                {
+                    strikes.get(event.getGuild()).put(event.getMember(), Math.toIntExact((Long) memberList.get(event.getMember().getId())));
+                }
+                else
+                {
+                    strikes.get(event.getGuild()).put(event.getMember(), 0);
+                    memberList.put(event.getMember().getId(), 0);
+                    try (FileWriter fileWriter = new FileWriter(event.getGuild().getId() + ".json"))
+                    {
+                        fileWriter.write(memberList.toJSONString());
+                        fileWriter.flush();
+                    }
+                    catch (IOException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
             }
-            else
+            catch (IOException | ParseException e)
             {
-                strikes.get(event.getGuild()).put(event.getMember(), 0);
-                memberList.put(event.getMember().getId(), 0);
-                try (FileWriter fileWriter = new FileWriter(event.getGuild().getId() + ".json"))
-                {
-                    fileWriter.write(memberList.toJSONString());
-                    fileWriter.flush();
-                }
-                catch (IOException e)
-                {
-                    e.printStackTrace();
-                }
+                e.printStackTrace();
             }
         }
-        catch (IOException | ParseException e)
-        {
-            e.printStackTrace();
-        }
-
     }
 
     @Override
@@ -302,20 +306,24 @@ public class Commands extends ListenerAdapter
 
 
             Member member = event.getOption("user").getAsMember();
-
-            strikes.get(event.getGuild()).put(member, strikes.get(event.getGuild()).get(member) + 1);
-
-            if (strikes.get(event.getGuild()).get(member) < 3)
+            if (!member.getUser().isBot())
             {
-                event.reply("User: " + member.getAsMention() + " has " + strikes.get(event.getGuild()).get(member) + " strike(s)!").queue();
-                addStrikeToJSON(event.getGuild(), member, 1);
+                strikes.get(event.getGuild()).put(member, strikes.get(event.getGuild()).get(member) + 1);
+                if (strikes.get(event.getGuild()).get(member) < 3)
+                {
+                    event.reply("User: " + member.getAsMention() + " has " + strikes.get(event.getGuild()).get(member) + " strike(s)!").queue();
+                    addStrikeToJSON(event.getGuild(), member, 1);
+                }
+                else
+                {
+                    event.reply("3 strikes and " + member.getAsMention() + " is out!").queue();
+                    member.kick().queue();
+                }
             }
             else
             {
-                event.reply("3 strikes and " + member.getAsMention() + " is out!").queue();
-                member.kick().queue();
+                event.reply("Please don't strike the bots").queue();
             }
-
 
         }
         else if (event.getName().equals("roulette"))
@@ -386,8 +394,6 @@ public class Commands extends ListenerAdapter
             if (!previousEmbed.equals(""))
                 event.getMessageChannel().deleteMessageById(previousEmbed).queue();
             previousEmbed = message.getId();
-
-
         }
     }
 
