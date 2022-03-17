@@ -351,8 +351,13 @@ public class Commands extends ListenerAdapter
         {
             embedLL = new EmbedLinkedList();
             Guild guild = event.getGuild();
-            List<Member> members = guild.getMembers();
+            Object[] members = (strikes.get(guild).keySet().toArray());
             event.deferReply(true).queue();
+            int memberSize = 0;
+            for (int i = 0; i < guild.getMemberCount(); i++)
+            {
+                memberSize += (guild.getMembers().get(i).getUser().isBot()) ? 0 : 1;
+            }
             int pages = (int) Math.ceil(guild.getMemberCount() / 10.0);
             List<Button> buttons = new ArrayList<>();
             for (int i = 1; i <= pages; i++)
@@ -366,8 +371,9 @@ public class Commands extends ListenerAdapter
 
                 for (int j = 0; j < 10 && ((i - 1) * 10 + j) < size; j++)
                 {
-                    String value = members.get((i - 1) * 10 + j).getAsMention() + ": ";
-                    int numberOfStrikes = strikes.get(guild).get(members.get((i - 1) * 10 + j));
+                    String value = ((Member) members[(i - 1) * 10 + j]).getAsMention() + ": ";
+
+                    int numberOfStrikes = strikes.get(guild).get(((Member) members[(i - 1) * 10 + j]));
                     if (numberOfStrikes == 0)
                         value += "Good job, no strikes!";
                     else if (numberOfStrikes == 1)
@@ -387,13 +393,7 @@ public class Commands extends ListenerAdapter
             buttons.add(Button.primary("last", Emoji.fromUnicode("⏩")));
 
             embedLL.setCurrent(embedLL.getHeadBuilder());
-            RestAction<Message> ra = event.getHook().sendMessageEmbeds(embedLL.getCurrentBuilder().build()).addActionRow(buttons);
-            Message message = ra.complete();
-
-
-            if (!previousEmbed.equals(""))
-                event.getMessageChannel().deleteMessageById(previousEmbed).queue();
-            previousEmbed = message.getId();
+            event.getHook().sendMessageEmbeds(embedLL.getCurrentBuilder().build()).addActionRow(buttons).queue();
         }
     }
 
