@@ -14,10 +14,13 @@ import java.io.IOException;
 import java.util.EnumSet;
 import java.util.Iterator;
 
+import static java.lang.System.getenv;
+
 public class Main {
     public static JDA jda;
     @SuppressWarnings("unchecked")
     public static void main(String[] args) throws LoginException, IOException, ParseException, InterruptedException {
+        String token = System.getenv("BOT_TOKEN");
         EnumSet<GatewayIntent> intents = EnumSet.of(
                 GatewayIntent.GUILD_BANS,
                 GatewayIntent.GUILD_EMOJIS,
@@ -29,7 +32,7 @@ public class Main {
                 GatewayIntent.DIRECT_MESSAGE_REACTIONS,
                 GatewayIntent.GUILD_MEMBERS
         );
-        jda = JDABuilder.createDefault("NTg3ODY5Mjc1ODE0MTAxMDA1.XP817Q.JFc_umhqKc0PViS1Qlz7LnEpge4", intents).setMemberCachePolicy(MemberCachePolicy.ALL).build();
+        jda = JDABuilder.createDefault(token, intents).setMemberCachePolicy(MemberCachePolicy.ALL).build();
 
         jda.getPresence().setStatus(OnlineStatus.DO_NOT_DISTURB);
         jda.getPresence().setActivity(Activity.playing("IntelliJ"));
