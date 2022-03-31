@@ -23,6 +23,7 @@
                 <configuration>
                     <archive>
                         <manifestFile>src/main/resources/META-INF/MANIFEST.MF</manifestFile>
+                        <manifest>DiscordBot.Main</manifest>
                     </archive>
                 </configuration>
             </plugin>
