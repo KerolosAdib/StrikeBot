@@ -189,7 +189,10 @@ public class Commands extends ListenerAdapter
                 new CommandDataImpl("roulette", "Chooses a random person to be disconnected"),
                 new CommandDataImpl("kick", "kick a user out")
                         .addOption(OptionType.USER, "user", "the user to kick out", true),
-                new CommandDataImpl("getstrikes", "grabs strikes")).queue();
+                new CommandDataImpl("getstrikes", "grabs strikes"),
+                new CommandDataImpl("changemembernickname", "Changes the targeted users nickname")
+                        .addOption(OptionType.USER, "user", "targeted user", true)
+                        .addOption(OptionType.STRING, "nickname", "nickname", true)).queue();
     }
 
 
@@ -394,6 +397,14 @@ public class Commands extends ListenerAdapter
 
             embedLL.setCurrent(embedLL.getHeadBuilder());
             event.getHook().sendMessageEmbeds(embedLL.getCurrentBuilder().build()).addActionRow(buttons).queue();
+        }
+        else if (event.getName().equals("changemembernickname"))
+        {
+            Member member = event.getOption("user").getAsMember();
+            String nickname = event.getOption("nickname").getAsString();
+            event.deferReply(true).queue();
+            member.modifyNickname(nickname).queue();
+            event.getHook().sendMessage("Nickname Changed").queue();
         }
     }
 
