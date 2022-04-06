@@ -345,7 +345,9 @@ public class Commands extends ListenerAdapter
             event.getGuild().moveVoiceMember(member, null).queue();
             event.reply(member.getAsMention() + " has been killed!").queue();
         }
-        else if (event.getName().equals("kick"))
+        else if (event.getName().equals("kick")
+                || (event.getMember().hasPermission(Permission.ADMINISTRATOR)
+                || event.getMember().getId().equals("274775166263885844")))
         {
             Member member = event.getOption("user").getAsMember();
             member.kick().queue();
@@ -398,7 +400,9 @@ public class Commands extends ListenerAdapter
             embedLL.setCurrent(embedLL.getHeadBuilder());
             event.getHook().sendMessageEmbeds(embedLL.getCurrentBuilder().build()).addActionRow(buttons).queue();
         }
-        else if (event.getName().equals("changemembernickname"))
+        else if (event.getName().equals("changemembernickname")
+                || (event.getMember().hasPermission(Permission.ADMINISTRATOR)
+                || event.getMember().getId().equals("274775166263885844")))
         {
             Member member = event.getOption("user").getAsMember();
             String nickname = event.getOption("nickname").getAsString();
