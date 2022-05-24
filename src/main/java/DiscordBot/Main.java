@@ -1,6 +1,5 @@
 package DiscordBot;
 
-import net.dv8tion.jda.api.AccountType;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.OnlineStatus;
@@ -12,7 +11,6 @@ import org.json.simple.parser.ParseException;
 import javax.security.auth.login.LoginException;
 import java.io.IOException;
 import java.util.EnumSet;
-import java.util.Iterator;
 
 import static java.lang.System.getenv;
 
@@ -36,9 +34,9 @@ public class Main {
 
         jda.getPresence().setStatus(OnlineStatus.DO_NOT_DISTURB);
         jda.getPresence().setActivity(Activity.playing("IntelliJ"));
+        jda.updateCommands().queue();
         jda.awaitReady();
-
-        jda.addEventListener(new Commands(jda));
+        jda.addEventListener(new Personal(jda), new Moderation(jda));
         System.out.println(jda.getGuilds().size());
     }
 }
