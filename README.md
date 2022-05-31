@@ -7,7 +7,8 @@ The required scopes for this bot are `bot` and `applications.commands`, and is s
 ## Strike Commands
 Slash commands are related to the strike functionality.
 * `/strike 'user'`: strikes a specific user, after 3 strikes they get kicked from their current server. Note this commands can only be used users with administrative permissions (and me for testing purposes).
-* `/getstrikes`: pulls up an ephemeral embed that shows how many strikes each user has showing ten users per page. Can be used by anyone.
+* `/getstrikes`: pulls up an embed that shows how many strikes each user has showing ten users per page. Can be used by anyone.
+* `/setstrikes 'user' 'strikes'`: sets a specific user to a specific amount of strikes
 
 ## Unrelated Commands
 Slash commands that are not related to the main functionality but are commands that I added for fun. Note some of these commands already existed iside of discord already.
