@@ -1,11 +1,11 @@
 package DiscordBot;
 
+import com.intellij.ui.JBColor;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.MessageBuilder;
 import net.dv8tion.jda.api.Permission;
-import net.dv8tion.jda.api.entities.Emoji;
-import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRemoveEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -31,6 +31,9 @@ import java.util.List;
 public class Moderation extends ListenerAdapter
 {
     HashMap<Guild, HashMap<Member, Integer>> strikes;
+    HashMap<Guild, EmbedLinkedList> ells;
+    HashMap<Guild, HashMap<Channel, String>> previousEmbeds;
+    HashMap<Guild, HashMap<Channel, EmbedLinkedList>> currentEmbeds;
     EmbedLinkedList embedLL;
     List<EmbedBuilder> ebs;
 
@@ -38,7 +41,10 @@ public class Moderation extends ListenerAdapter
     {
         super();
         strikes = new HashMap<>();
+        ells = new HashMap<>();
         ebs = new ArrayList<>();
+        previousEmbeds = new HashMap<>();
+        currentEmbeds = new HashMap<>();
         for (int i = 0; i < jda.getGuilds().size(); i++)
         {
             File file = new File(jda.getGuilds().get(i).getId() + ".json");
@@ -52,10 +58,6 @@ public class Moderation extends ListenerAdapter
                     Member member = members.get(j);
                     if (!member.getUser().isBot())
                     {
-                        if (member.getId().equals("274775166263885844") && member.isTimedOut())
-                        {
-                            member.removeTimeout().queue();
-                        }
                         memberList.put(member.getId(), 0);
                         temp.put(member, 0);
                     }
@@ -83,21 +85,19 @@ public class Moderation extends ListenerAdapter
                     List<Member> members = guild.loadMembers().get();
                     for (Member member : members)
                     {
-                        if (member.getId().equals("274775166263885844") && member.isTimedOut())
-                            member.removeTimeout().queue();
-                        memberIds.add(member.getId());
-                    }
-
-
-                    for (int j = 0; j < memberList.size(); j++)
-                    {
-                        String str = memberList.keySet().toArray()[j].toString();
-                        if (memberIds.contains(str))
+/*                        if (!member.getUser().isBot())
+                            memberIds.add(member.getId());*/
+                        if (memberList.containsKey(member.getId()) && !member.getUser().isBot())
                         {
-                            temp.put(members.get(memberIds.indexOf(str)), Math.toIntExact((Long) memberList.get(str)));
-
+                            temp.put(member, Math.toIntExact((Long) memberList.get(member.getId())));
+                        }
+                        else if (!memberList.containsKey(member.getId()) && !member.getUser().isBot())
+                        {
+                            temp.put(member, 0);
+                            addMemberToJSON(guild, memberList, member);
                         }
                     }
+
                     strikes.put(guild, temp);
                 }
                 catch (IOException | ParseException e)
@@ -112,6 +112,20 @@ public class Moderation extends ListenerAdapter
         jda.upsertCommand(new CommandDataImpl("setstrikes", "sets the specified user to the specified amount of strikes")
                 .addOption(OptionType.USER, "user", "The user to strike", true)
                 .addOption(OptionType.INTEGER, "strikes", "The number of strikes to set on the specified user", true)).queue();
+    }
+
+    public void addMemberToJSON(Guild guild, JSONObject memberList, Member member)
+    {
+        try (FileWriter fileWriter = new FileWriter(guild.getId() + ".json"))
+        {
+            memberList.put(member.getId(), 0);
+            fileWriter.write(memberList.toJSONString());
+            fileWriter.flush();
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -161,7 +175,6 @@ public class Moderation extends ListenerAdapter
     @Override
     public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent event)
     {
-
         if (event.getName().equals("strike")
                 && (event.getMember().hasPermission(Permission.ADMINISTRATOR)
                 || event.getMember().getId().equals("274775166263885844")))
@@ -189,17 +202,18 @@ public class Moderation extends ListenerAdapter
         }
         else if (event.getName().equals("getstrikes"))
         {
-            embedLL = new EmbedLinkedList();
             Guild guild = event.getGuild();
+
             Object[] members = (strikes.get(guild).keySet().toArray());
-            event.deferReply(true).queue();
+            event.deferReply().queue();
             int memberSize = 0;
             for (int i = 0; i < guild.getMemberCount(); i++)
             {
                 memberSize += (guild.getMembers().get(i).getUser().isBot()) ? 0 : 1;
             }
-            int pages = (int) Math.ceil(guild.getMemberCount() / 10.0);
+            int pages = (int) Math.ceil(memberSize / 10.0);
             List<Button> buttons = new ArrayList<>();
+            ells.put(guild, new EmbedLinkedList());
             for (int i = 1; i <= pages; i++)
             {
                 EmbedBuilder eb = new EmbedBuilder();
@@ -224,16 +238,28 @@ public class Moderation extends ListenerAdapter
                         value += "❌❌❌";
                     eb.addField("", value, false);
                 }
-                embedLL.addBack(eb);
+                ells.get(guild).addBack(eb);
             }
 
             buttons.add(Button.primary("first", Emoji.fromUnicode("⏪")));
             buttons.add(Button.primary("last_page", Emoji.fromUnicode("◀")));
             buttons.add(Button.primary("next_page", Emoji.fromUnicode("▶")));
             buttons.add(Button.primary("last", Emoji.fromUnicode("⏩")));
+            ells.get(guild).setCurrent(ells.get(guild).getHeadBuilder());
+            currentEmbeds.putIfAbsent(guild, new HashMap<>());
+            currentEmbeds.get(guild).put(event.getChannel(), ells.get(guild).clone());
 
-            embedLL.setCurrent(embedLL.getHeadBuilder());
-            event.getHook().sendMessageEmbeds(embedLL.getCurrentBuilder().build()).addActionRow(buttons).queue();
+            MessageBuilder messageBuilder = new MessageBuilder();
+            messageBuilder.setEmbeds(ells.get(guild).getCurrentBuilder().build());
+            Message message = messageBuilder.build();
+            if (previousEmbeds.containsKey(guild) && previousEmbeds.get(guild).containsKey(event.getChannel()))
+                event.getHook().deleteMessageById(previousEmbeds.get(guild).get(event.getChannel())).queue();
+            event.getHook().sendMessage(message).addActionRow(buttons).queue((m) ->
+            {
+                String id = m.getId();
+                previousEmbeds.putIfAbsent(guild, new HashMap<>());
+                previousEmbeds.get(guild).put(event.getChannel(), id);
+            });
         }
         else if (event.getName().equals("setstrikes") && event.getMember().hasPermission(Permission.ADMINISTRATOR))
         {
@@ -248,6 +274,7 @@ public class Moderation extends ListenerAdapter
     {
         List<Button> buttons = new ArrayList<>();
         Guild guild = event.getGuild();
+        Channel channel = event.getChannel();
         List<Member> members = guild.getMembers();
         int pages = (int) Math.ceil(guild.getMemberCount() / 10.0);
         EmbedBuilder eb = new EmbedBuilder();
@@ -255,22 +282,23 @@ public class Moderation extends ListenerAdapter
         buttons.add(Button.primary("last_page", Emoji.fromUnicode("◀")));
         buttons.add(Button.primary("next_page", Emoji.fromUnicode("▶")));
         buttons.add(Button.primary("last", Emoji.fromUnicode("⏩")));
+        EmbedLinkedList embedLinkedList = currentEmbeds.get(guild).get(channel);
         switch (event.getComponentId())
         {
             case "first":
-                embedLL.setCurrent(embedLL.getHeadBuilder());
+                embedLinkedList.setCurrent(embedLinkedList.getHeadBuilder());
                 break;
             case "last_page":
-                embedLL.decrementCurrent();
+                embedLinkedList.decrementCurrent();
                 break;
             case "next_page":
-                embedLL.incrementCurrent();
+                embedLinkedList.incrementCurrent();
                 break;
             case "last":
-                embedLL.setCurrent(embedLL.getTailBuilder());
+                embedLinkedList.setCurrent(embedLinkedList.getTailBuilder());
                 break;
         }
-        event.editMessageEmbeds(embedLL.getCurrentBuilder().build()).setActionRow(buttons).queue();
+        event.editMessageEmbeds(embedLinkedList.getCurrentBuilder().build()).setActionRow(buttons).queue();
     }
 
     public void addStrikeToJSON(Guild guild, Member member, int strikes)
@@ -293,8 +321,7 @@ public class Moderation extends ListenerAdapter
             e.printStackTrace();
         }
     }
-
-
+    
 
     /*    @Override
     public void onGuildVoiceJoin(@NotNull GuildVoiceJoinEvent event) {
