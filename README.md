@@ -18,4 +18,4 @@ All of these commands except /roulette can only be used with administrative perm
 * `/changemembernickname 'user' 'nickname'`: changes the specified users nickname into the specified nickname.
 
 ## Invite link
-* https://discord.com/api/oauth2/authorize?client_id=587869275814101005&permissions=8&scope=bot
+* https://discord.com/api/oauth2/authorize?client_id=587869275814101005&permissions=8&scope=bot%20applications.commands
